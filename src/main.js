@@ -136,39 +136,20 @@ function makeGroundTexture() {
   return tex;
 }
 
-// Параметры размещения центральных объектов (POND используется и для дыры в земле).
+// Параметры размещения центральных объектов.
 const PILE = { size: 9, sink: 1.5 }; // куча грязи: размер и насколько утоплена в землю
-const POND = {
-  url: 'models/pond_with_waterfalls.glb',
-  x: -15,
-  z: 6,
-  size: 14,
-  sink: 1.2, // пруд опущен, но меньше кучи
-  holeRadius: 6.5, // радиус отверстия в земле под пруд
-};
-const ROCK = { url: 'models/Rock2.fbx', x: 7, z: 0, size: 4 }; // крупнее и заметнее
+const POND = { url: 'models/pond_with_waterfalls.glb', x: -15, z: 6, size: 14, sink: 0.3 };
+const ROCK = { url: 'models/Rock2.fbx', x: 7, z: 0, size: 4 };
 
-// Земля с круглым отверстием под пруд: сквозь него виден basin водоёма, а не трава на y=0.
-const groundShape = new THREE.Shape();
-groundShape.moveTo(-1000, -1000);
-groundShape.lineTo(1000, -1000);
-groundShape.lineTo(1000, 1000);
-groundShape.lineTo(-1000, -1000);
-const pondHole = new THREE.Path();
-// Локальные XY земли; после поворота -90° по X локальное y → мировое -z.
-pondHole.absarc(POND.x, -POND.z, POND.holeRadius, 0, Math.PI * 2, true);
-groundShape.holes.push(pondHole);
-
-const groundTex = makeGroundTexture();
-groundTex.repeat.set(0.04, 0.04); // у ShapeGeometry UV = позиция → тайл каждые 25 ед.
+// Сплошная земля (PlaneGeometry). Дыру под пруд пока НЕ вырезаем —
+// ShapeGeometry с дырой сломала террен (геометрия уходила в брак, деревья висели).
 const ground = new THREE.Mesh(
-  new THREE.ShapeGeometry(groundShape),
+  new THREE.PlaneGeometry(2000, 2000),
   new THREE.MeshStandardMaterial({
-    map: groundTex,
+    map: makeGroundTexture(),
     roughness: 1,
     metalness: 0,
     envMapIntensity: 0.1,
-    side: THREE.DoubleSide,
   }),
 );
 ground.rotation.x = -Math.PI / 2;
@@ -366,6 +347,17 @@ gltfLoader.load(
       if (c.isMesh) {
         c.castShadow = false; // unlit + 400+ мешей — тени слишком дороги
         c.receiveShadow = false;
+        const mats = Array.isArray(c.material) ? c.material : [c.material];
+        mats.forEach((m) => {
+          // В GLB вода почти прозрачная (alpha 0.09) — делаем непрозрачной, иначе
+          // сквозь неё просвечивает земля.
+          if (m.transparent) {
+            m.transparent = false;
+            m.opacity = 1;
+            m.depthWrite = true;
+            m.needsUpdate = true;
+          }
+        });
       }
     });
     const box = new THREE.Box3().setFromObject(pond);
@@ -394,7 +386,6 @@ fbxLoader.load(
         mats.forEach((m) => {
           if (m.emissive) m.emissive.set(0x000000); // у FBX emissive == color
           if (m.specular) m.specular.set(0x111111);
-          if (m.color) m.color.set(0x7a7a7a); // осветляем — иначе тёмный камень теряется
           m.needsUpdate = true;
         });
       }

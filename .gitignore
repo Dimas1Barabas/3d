@@ -3,3 +3,6 @@ dist
 .DS_Store
 *.local
 .idea/
+
+# Слишком большие для Git ассеты (>100 МБ) — используй Git LFS
+public/models/light_soil_dirt_pile.glb

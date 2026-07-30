@@ -41,10 +41,9 @@ controls.maxPolarAngle = Math.PI * 0.495; // не проваливаться п�
 controls.target.set(0, 3, 0);
 
 /* ──────────────────────────── СВЕТ ──────────────────────────── */
-// Небесная подсветка (sky/ground). Теперь, когда emissive материалов обнулён,
-// умеренный ambient даёт естественную заливку, а тени всё равно явно темнее
-// освещённых солнцем участков.
-scene.add(new THREE.HemisphereLight(0xbcd4e8, 0x3a4a2a, 0.4));
+// Небесная подсветка намеренно слабая — затенённые зоны затемняются,
+// контраст теней высокий.
+scene.add(new THREE.HemisphereLight(0xbcd4e8, 0x3a4a2a, 0.18));
 
 // «Солнце» — тёплое и сильное, единственный доминирующий источник: именно
 // направленность + контраст дают ощущение настоящего солнца, а не белого света.
@@ -143,7 +142,7 @@ const ground = new THREE.Mesh(
     map: makeGroundTexture(),
     roughness: 1,
     metalness: 0,
-    envMapIntensity: 0.15,
+    envMapIntensity: 0.1,
   }),
 );
 ground.rotation.x = -Math.PI / 2;

@@ -10,9 +10,9 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
 // Реализм: мягкие тени + кинематографичный тонмаппинг + корректный цвет
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.VSMShadowMap; // r185: PCFSoft устарел; VSM даёт мягкие тени
+renderer.shadowMap.type = THREE.PCFShadowMap; // чёткие, отчётливые тени
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.5; // яркое небо → экспозицию понижаем
+renderer.toneMappingExposure = 0.55;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 document.body.appendChild(renderer.domElement);
@@ -47,9 +47,9 @@ scene.add(new THREE.HemisphereLight(0xbcd6f0, 0x4a5d32, 0.6));
 
 // «Солнце» — ключевой источник с направленными тенями.
 // Позицию задаём позже из направления солнца на небе (см. updateSun).
-const sunLight = new THREE.DirectionalLight(0xfff4e0, 3.2);
+const sunLight = new THREE.DirectionalLight(0xfff6e8, 4.6);
 sunLight.castShadow = true;
-sunLight.shadow.mapSize.set(2048, 2048);
+sunLight.shadow.mapSize.set(4096, 4096);
 sunLight.shadow.camera.near = 1;
 sunLight.shadow.camera.far = 400;
 sunLight.shadow.camera.left = -60;
@@ -57,8 +57,8 @@ sunLight.shadow.camera.right = 60;
 sunLight.shadow.camera.top = 60;
 sunLight.shadow.camera.bottom = -60;
 sunLight.shadow.bias = -0.0001;
-sunLight.shadow.normalBias = 0.02;
-sunLight.shadow.radius = 4;
+sunLight.shadow.normalBias = 0.01;
+sunLight.shadow.radius = 2;
 scene.add(sunLight);
 scene.add(sunLight.target);
 
@@ -99,8 +99,8 @@ function updateSun(elevationDeg, azimuthDeg) {
   scene.environment = envRT.texture;
 }
 
-// Невысокое тёплое солнце ≈ «золотой час»: длинные мягкие тени, тёплый свет.
-updateSun(12, 180);
+// Солнце повыше — яркое дневное освещение, тени короче и отчётливее.
+updateSun(38, 180);
 
 /* ──────────────────────────── ЗЕМЛЯ ──────────────────────────── */
 // Процедурная травянистая текстура (canvas) — без внешних файлов.
@@ -206,7 +206,9 @@ const FIELD_RADIUS = 55; // радиус засеваемой области
 const CLEARING = 8; // пустое место в центре (открытое поле, место для камеры)
 
 function scatter(items) {
+  // Деревья / кусты / камни — равномерно по полю.
   items.forEach(({ item, template }) => {
+    if (item.file.startsWith('Grass')) return; // траву сажаем плотными пятнами ниже
     for (let i = 0; i < item.count; i++) {
       // sqrt → равномерная плотность по площади; равномерный угол.
       const angle = Math.random() * Math.PI * 2;
@@ -219,6 +221,29 @@ function scatter(items) {
       scene.add(inst);
     }
   });
+
+  // Трава — плотными кластерами (пятнами), чтобы росла кучно, а не поштучно.
+  const grass = items
+    .filter(({ item }) => item.file.startsWith('Grass'))
+    .map((g) => g.template);
+  const CLUSTERS = 45; // число пятен
+  const PER_CLUSTER = 6; // травинок в пятне
+  const CLUSTER_RADIUS = 2.5; // радиус пятна
+  for (let c = 0; c < CLUSTERS; c++) {
+    const ca = Math.random() * Math.PI * 2;
+    const cr = CLEARING + (FIELD_RADIUS - CLEARING) * Math.sqrt(Math.random());
+    const cx = Math.cos(ca) * cr;
+    const cz = Math.sin(ca) * cr;
+    for (let k = 0; k < PER_CLUSTER; k++) {
+      const a = Math.random() * Math.PI * 2;
+      const d = Math.random() * CLUSTER_RADIUS;
+      const inst = grass[(Math.random() * grass.length) | 0].clone();
+      inst.position.set(cx + Math.cos(a) * d, 0, cz + Math.sin(a) * d);
+      inst.rotation.y = Math.random() * Math.PI * 2;
+      inst.scale.multiplyScalar(0.85 + Math.random() * 0.3);
+      scene.add(inst);
+    }
+  }
   console.info('[3d] Растительность расставлена');
 }
 

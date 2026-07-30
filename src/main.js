@@ -43,10 +43,11 @@ controls.target.set(0, 3, 0);
 /* ──────────────────────────── СВЕТ ──────────────────────────── */
 // Слабый ambient — именно поэтому тени получаются тёмными и заметными
 // (затенённые зоны почти не заливаются светом, контраст с освещёнными высок).
-scene.add(new THREE.HemisphereLight(0xbcd4e8, 0x3a4a2a, 0.22));
+scene.add(new THREE.HemisphereLight(0xbcd4e8, 0x3a4a2a, 0.12));
 
-// «Солнце» — единственный сильный источник, пробивающийся сквозь джунгли.
-const sunLight = new THREE.DirectionalLight(0xfff0d6, 3.8);
+// «Солнце» — тёплое и сильное, единственный доминирующий источник: именно
+// направленность + контраст дают ощущение настоящего солнца, а не белого света.
+const sunLight = new THREE.DirectionalLight(0xffe2b0, 5.0);
 sunLight.castShadow = true;
 sunLight.shadow.mapSize.set(4096, 4096);
 sunLight.shadow.camera.near = 1;
@@ -141,7 +142,7 @@ const ground = new THREE.Mesh(
     map: makeGroundTexture(),
     roughness: 1,
     metalness: 0,
-    envMapIntensity: 0.3,
+    envMapIntensity: 0.15,
   }),
 );
 ground.rotation.x = -Math.PI / 2;
@@ -187,7 +188,7 @@ function makeTemplate(item) {
         c.castShadow = item.shadow;
         c.receiveShadow = true;
         // IBL не должен заливать тени — гасим влияние окружения на материал.
-        if (c.material && 'envMapIntensity' in c.material) c.material.envMapIntensity = 0.3;
+        if (c.material && 'envMapIntensity' in c.material) c.material.envMapIntensity = 0.15;
       }
     });
 

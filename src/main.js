@@ -10,8 +10,8 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap; // чёткие, отчётливые тени
-renderer.toneMapping = THREE.AgXToneMapping; // AgX сохраняет цвет в светах — листва не выцветает к белому
-renderer.toneMappingExposure = 1.0;
+renderer.toneMapping = THREE.NeutralToneMapping; // нейтральный тонмаппинг — не высветляет цвета к белому
+renderer.toneMappingExposure = 0.75; // общая яркость ниже
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 document.body.appendChild(renderer.domElement);
@@ -20,8 +20,8 @@ const pmrem = new THREE.PMREMGenerator(renderer);
 
 /* ─────────────────────────── СЦЕНА ─────────────────────────── */
 const scene = new THREE.Scene();
-// Зелёноватая дымка джунглей — дальняя растительность растворяется в тумане.
-scene.fog = new THREE.Fog(0xb0bca0, 70, 850);
+// Тёмно-зелёная дымка джунглей — дальняя растительность растворяется во мху, а не в белизне.
+scene.fog = new THREE.Fog(0x6e7d58, 60, 800);
 
 /* ──────────────────────── КАМЕРА + УПРАВЛЕНИЕ ──────────────────────── */
 const camera = new THREE.PerspectiveCamera(

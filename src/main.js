@@ -12,7 +12,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap; // чёткие, отчётливые тени
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.55;
+renderer.toneMappingExposure = 0.5;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 document.body.appendChild(renderer.domElement);
@@ -47,7 +47,7 @@ scene.add(new THREE.HemisphereLight(0xbcd6f0, 0x4a5d32, 0.6));
 
 // «Солнце» — ключевой источник с направленными тенями.
 // Позицию задаём позже из направления солнца на небе (см. updateSun).
-const sunLight = new THREE.DirectionalLight(0xfff6e8, 4.6);
+const sunLight = new THREE.DirectionalLight(0xfff0d6, 3.6);
 sunLight.castShadow = true;
 sunLight.shadow.mapSize.set(4096, 4096);
 sunLight.shadow.camera.near = 1;
@@ -99,8 +99,9 @@ function updateSun(elevationDeg, azimuthDeg) {
   scene.environment = envRT.texture;
 }
 
-// Солнце повыше — яркое дневное освещение, тени короче и отчётливее.
-updateSun(38, 180);
+// Тёплое низковатое солнце ≈ «золотой час»: насыщенные цвета и богатый свет.
+// Чуть выше исходных 12°, чтобы тени были покороче, но не блёклый полдень.
+updateSun(20, 180);
 
 /* ──────────────────────────── ЗЕМЛЯ ──────────────────────────── */
 // Процедурная травянистая текстура (canvas) — без внешних файлов.

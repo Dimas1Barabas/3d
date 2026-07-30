@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-const file = 'public/models/light_soil_dirt_pile.glb';
+const file = process.argv[2] || 'public/models/light_soil_dirt_pile.glb';
 const buf = fs.readFileSync(file);
 console.log(`file: ${file}`);
 console.log(`size on disk: ${(buf.length / 1048576).toFixed(1)} MB`);

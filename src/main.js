@@ -333,6 +333,64 @@ gltfLoader.load(
     console.warn(`[3d] Файла ${PILE_URL} нет на диске — добавь его или убери загрузчик.`),
 );
 
+/* ───────────────────── Водоём с водопадами (GLB, unlit) ───────────────────── */
+// Слегка притапливаем в землю (sink), чтобы берег выглядел естественным.
+const POND = { url: 'models/pond_with_waterfalls.glb', x: -15, z: 6, size: 14, sink: 1.5 };
+gltfLoader.load(
+  POND.url,
+  (gltf) => {
+    const pond = gltf.scene;
+    pond.traverse((c) => {
+      if (c.isMesh) {
+        c.castShadow = false; // unlit + 400+ мешей — тени слишком дороги
+        c.receiveShadow = false;
+      }
+    });
+    const box = new THREE.Box3().setFromObject(pond);
+    const dim = box.getSize(new THREE.Vector3());
+    pond.scale.multiplyScalar(POND.size / (Math.max(dim.x, dim.y, dim.z) || 1));
+    pond.updateMatrixWorld(true);
+    const b = new THREE.Box3().setFromObject(pond);
+    const center = b.getCenter(new THREE.Vector3());
+    pond.position.set(POND.x - center.x, -b.min.y - POND.sink, POND.z - center.z);
+    scene.add(pond);
+    console.info('[3d] Водоём загружен');
+  },
+  undefined,
+  () => console.warn(`[3d] Файла ${POND.url} нет на диске.`),
+);
+
+/* ───────────────────── Отдельный камень на поверхности (FBX) ───────────────────── */
+const ROCK = { url: 'models/Rock2.fbx', x: 11, z: -7, size: 2.6 };
+fbxLoader.load(
+  ROCK.url,
+  (raw) => {
+    raw.traverse((c) => {
+      if (c.isMesh) {
+        c.castShadow = true;
+        c.receiveShadow = true;
+        const mats = Array.isArray(c.material) ? c.material : [c.material];
+        mats.forEach((m) => {
+          if (m.emissive) m.emissive.set(0x000000); // у FBX emissive == color
+          if (m.specular) m.specular.set(0x111111);
+          m.needsUpdate = true;
+        });
+      }
+    });
+    const box = new THREE.Box3().setFromObject(raw);
+    const dim = box.getSize(new THREE.Vector3());
+    raw.scale.multiplyScalar(ROCK.size / (Math.max(dim.x, dim.y, dim.z) || 1));
+    raw.updateMatrixWorld(true);
+    const b = new THREE.Box3().setFromObject(raw);
+    const center = b.getCenter(new THREE.Vector3());
+    raw.position.set(ROCK.x - center.x, -b.min.y, ROCK.z - center.z);
+    scene.add(raw);
+    console.info('[3d] Камень загружен');
+  },
+  undefined,
+  (e) => console.warn('[3d] Ошибка загрузки камня:', e),
+);
+
 /* ─────────────────────── РАЗМЕР ОКНА + ЦИКЛ ─────────────────────── */
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;

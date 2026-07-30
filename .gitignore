@@ -5,5 +5,4 @@ dist
 .idea/
 
 # Тяжёлые GLB-модели — держим локально, в Git не пушим
-public/models/light_soil_dirt_pile.glb
-public/models/pond_with_waterfalls.glb
+public/models/*.glb

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
 
 /* ───────────────────────── РЕНДЕРЕР ───────────────────────── */
@@ -161,10 +162,10 @@ function loadFBX(url) {
 
 // file, целевая высота, число экземпляров (трава сажается кластерами, count не важен), тень.
 const VEGETATION = [
-  { file: 'Tree1.fbx', height: 5.0, count: 90, shadow: true },
-  { file: 'Tree2.fbx', height: 5.5, count: 90, shadow: true },
-  { file: 'Tree3.fbx', height: 5.0, count: 90, shadow: true },
-  { file: 'Tree4.fbx', height: 6.0, count: 90, shadow: true },
+  { file: 'Tree1.fbx', height: 4.0, count: 55, shadow: true },
+  { file: 'Tree2.fbx', height: 4.4, count: 55, shadow: true },
+  { file: 'Tree3.fbx', height: 4.0, count: 55, shadow: true },
+  { file: 'Tree4.fbx', height: 4.8, count: 55, shadow: true },
   { file: 'Bush1.fbx', height: 1.4, count: 35, shadow: true },
   { file: 'Bush2.fbx', height: 1.2, count: 35, shadow: true },
   { file: 'Bush3.fbx', height: 1.3, count: 35, shadow: true },
@@ -177,7 +178,8 @@ const VEGETATION = [
 ];
 
 const FIELD_RADIUS = 50; // радиус засеваемой области (плотные джунгли)
-const CLEARING = 10; // открытая поляна в центре
+const TREE_CLEARING = 10; // открытая поляна в центре (без крупных деревьев)
+const GRASS_CLEARING = 5; // траву сажаем в т.ч. ближе к центру
 
 // Грузим модель один раз, нормализуем по высоте, ставим начало координат
 // группы в нижний-центр модели.
@@ -218,10 +220,10 @@ function makeTemplate(item) {
   });
 }
 
-// Случайная позиция на поле (sqrt → равномерность по площади), вне поляны.
-function fieldPos() {
+// Случайная позиция на поле (sqrt → равномерность по площади), вне поляны радиуса clearing.
+function fieldPos(clearing) {
   const angle = Math.random() * Math.PI * 2;
-  const r = CLEARING + (FIELD_RADIUS - CLEARING) * Math.sqrt(Math.random());
+  const r = clearing + (FIELD_RADIUS - clearing) * Math.sqrt(Math.random());
   return new THREE.Vector3(Math.cos(angle) * r, 0, Math.sin(angle) * r);
 }
 
@@ -232,12 +234,12 @@ function transformsFor(item) {
     out.push({ pos, rotY: Math.random() * Math.PI * 2, scale: 0.8 + Math.random() * 0.4 });
 
   if (item.file.startsWith('Grass')) {
-    // Трава — плотными пятнами (кластерами), густой подлесок.
+    // Трава — плотными пятнами (кластерами), в т.ч. ближе к центру.
     const CLUSTERS = 260;
     const PER_CLUSTER = 8;
     const CLUSTER_RADIUS = 2.2;
     for (let c = 0; c < CLUSTERS; c++) {
-      const center = fieldPos();
+      const center = fieldPos(GRASS_CLEARING);
       for (let k = 0; k < PER_CLUSTER; k++) {
         const a = Math.random() * Math.PI * 2;
         const d = Math.random() * CLUSTER_RADIUS;
@@ -245,7 +247,7 @@ function transformsFor(item) {
       }
     }
   } else {
-    for (let i = 0; i < item.count; i++) push(fieldPos());
+    for (let i = 0; i < item.count; i++) push(fieldPos(TREE_CLEARING));
   }
   return out;
 }
@@ -294,6 +296,42 @@ function scatter(items) {
 Promise.all(VEGETATION.map((item) => makeTemplate(item).then((template) => ({ item, template }))))
   .then(scatter)
   .catch((err) => console.error('[3d] Ошибка загрузки FBX:', err));
+
+/* ─────────────────── Центральная модель — куча земли (GLB) ─────────────────── */
+// 125 МБ, высокополигональная; материалы unlit (KHR_materials_unlit) — вид задаёт
+// текстура, на свет/тени модель не реагирует. Файл в .gitignore (>100 МБ), поэтому
+// на свежем клоне его нет — загрузчик молча пропустит и не уронит сцену.
+const gltfLoader = new GLTFLoader();
+const PILE_URL = 'models/light_soil_dirt_pile.glb';
+gltfLoader.load(
+  PILE_URL,
+  (gltf) => {
+    const pile = gltf.scene;
+    pile.traverse((c) => {
+      if (c.isMesh) {
+        c.castShadow = false; // дорогая высокополигональная тень + материал unlit
+        c.receiveShadow = false;
+      }
+    });
+    // Нормализуем до ~9 единиц и ставим по центру, на земле.
+    const box = new THREE.Box3().setFromObject(pile);
+    const size = box.getSize(new THREE.Vector3());
+    pile.scale.multiplyScalar(9 / (Math.max(size.x, size.y, size.z) || 1));
+    pile.updateMatrixWorld(true);
+    const b = new THREE.Box3().setFromObject(pile);
+    const center = b.getCenter(new THREE.Vector3());
+    pile.position.x -= center.x;
+    pile.position.z -= center.z;
+    pile.position.y -= b.min.y;
+    scene.add(pile);
+    console.info('[3d] Куча земли загружена');
+  },
+  (p) => {
+    if (p.total) console.info(`[3d] Куча земли: ${Math.round((p.loaded / p.total) * 100)}%`);
+  },
+  () =>
+    console.warn(`[3d] Файла ${PILE_URL} нет на диске — добавь его или убери загрузчик.`),
+);
 
 /* ─────────────────────── РАЗМЕР ОКНА + ЦИКЛ ─────────────────────── */
 window.addEventListener('resize', () => {

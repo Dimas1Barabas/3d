@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
 
 /* ───────────────────────── РЕНДЕРЕР ───────────────────────── */
@@ -21,7 +21,7 @@ const pmrem = new THREE.PMREMGenerator(renderer);
 
 /* ─────────────────────────── СЦЕНА ─────────────────────────── */
 const scene = new THREE.Scene();
-// Лёгкая дымка цвета горизонта — дальняя земля растворяется в небе.
+// Лёгкая дымка цвета горизонта — дальняя земля и растительность растворяются в небе.
 scene.fog = new THREE.Fog(0xbcd6f0, 60, 700);
 
 /* ──────────────────────── КАМЕРА + УПРАВЛЕНИЕ ──────────────────────── */
@@ -31,20 +31,19 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   5000,
 );
-camera.position.set(7, 3.5, 9);
+camera.position.set(12, 6, 16);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 controls.minDistance = 2;
-controls.maxDistance = 60;
+controls.maxDistance = 120;
 controls.maxPolarAngle = Math.PI * 0.495; // не проваливаться под землю
-controls.target.set(0, 1, 0);
+controls.target.set(0, 2, 0);
 
 /* ──────────────────────────── СВЕТ ──────────────────────────── */
 // Заполняющий свет неба/земли — мягкая подсветка теневых сторон.
-const hemi = new THREE.HemisphereLight(0xbcd6f0, 0x4a5d32, 0.6);
-scene.add(hemi);
+scene.add(new THREE.HemisphereLight(0xbcd6f0, 0x4a5d32, 0.6));
 
 // «Солнце» — ключевой источник с направленными тенями.
 // Позицию задаём позже из направления солнца на небе (см. updateSun).
@@ -52,11 +51,11 @@ const sunLight = new THREE.DirectionalLight(0xfff4e0, 3.2);
 sunLight.castShadow = true;
 sunLight.shadow.mapSize.set(2048, 2048);
 sunLight.shadow.camera.near = 1;
-sunLight.shadow.camera.far = 300;
-sunLight.shadow.camera.left = -25;
-sunLight.shadow.camera.right = 25;
-sunLight.shadow.camera.top = 25;
-sunLight.shadow.camera.bottom = -25;
+sunLight.shadow.camera.far = 400;
+sunLight.shadow.camera.left = -60;
+sunLight.shadow.camera.right = 60;
+sunLight.shadow.camera.top = 60;
+sunLight.shadow.camera.bottom = -60;
 sunLight.shadow.bias = -0.0001;
 sunLight.shadow.normalBias = 0.02;
 sunLight.shadow.radius = 4;
@@ -65,7 +64,7 @@ scene.add(sunLight.target);
 
 /* ──────────────────────────── НЕБО ──────────────────────────── */
 // Физический sky-шейлер (атмосферное рассеяние). Даёт реальный градиент
-// неба, видимое солнце и — главное — корректные отражения на металле.
+// неба, видимое солнце и корректные отражения на металле.
 const sky = new Sky();
 sky.scale.setScalar(4000);
 scene.add(sky);
@@ -85,8 +84,7 @@ function updateSun(elevationDeg, azimuthDeg) {
   const theta = THREE.MathUtils.degToRad(azimuthDeg);
   sunVec.setFromSphericalCoords(1, phi, theta);
 
-  // Видимое солнце на небе
-  skyU['sunPosition'].value.copy(sunVec);
+  skyU['sunPosition'].value.copy(sunVec); // видимое солнце на небе
 
   // Направляем источник света вдоль солнца
   sunLight.position.copy(sunVec).multiplyScalar(150);
@@ -112,20 +110,16 @@ function makeGroundTexture() {
   c.width = c.height = size;
   const ctx = c.getContext('2d');
 
-  // Базовый зелёный
   ctx.fillStyle = '#4a5d32';
   ctx.fillRect(0, 0, size, size);
 
-  // Крупные неровные пятна зелени/земли — естественная «поляна»
   for (let i = 0; i < 500; i++) {
     const x = Math.random() * size;
     const y = Math.random() * size;
     const r = 20 + Math.random() * 90;
-    const tone = Math.random();
-    if (tone < 0.7) {
+    if (Math.random() < 0.7) {
       ctx.fillStyle = `rgba(${50 + Math.random() * 40},${85 + Math.random() * 55},${35 + Math.random() * 35},0.25)`;
     } else {
-      // землянистые проплешины
       ctx.fillStyle = `rgba(${90 + Math.random() * 50},${70 + Math.random() * 35},${35 + Math.random() * 25},0.25)`;
     }
     ctx.beginPath();
@@ -133,12 +127,9 @@ function makeGroundTexture() {
     ctx.fill();
   }
 
-  // Мелкая травяная крошка для фактуры вблизи
   for (let i = 0; i < 40000; i++) {
-    const x = Math.random() * size;
-    const y = Math.random() * size;
     ctx.fillStyle = `rgba(${40 + Math.random() * 50},${70 + Math.random() * 60},${25 + Math.random() * 40},0.3)`;
-    ctx.fillRect(x, y, 2, 2);
+    ctx.fillRect(Math.random() * size, Math.random() * size, 2, 2);
   }
 
   const tex = new THREE.CanvasTexture(c);
@@ -151,100 +142,89 @@ function makeGroundTexture() {
 
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(2000, 2000),
-  new THREE.MeshStandardMaterial({
-    map: makeGroundTexture(),
-    roughness: 1,
-    metalness: 0,
-  }),
+  new THREE.MeshStandardMaterial({ map: makeGroundTexture(), roughness: 1, metalness: 0 }),
 );
 ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-/* ──────────────────── ДЕМО-ОБЪЕКТЫ (показывают реализм) ──────────────────── */
-// Удали этот блок, когда добавишь свою модель — он только чтобы сцена не
-// была пустой и было видно, как работают PBR + отражения неба.
-const demo = new THREE.Group();
+/* ──────────────────────── РАСТИТЕЛЬНОСТЬ (FBX) ──────────────────────── */
+const fbxLoader = new FBXLoader();
 
-const metalKnot = new THREE.Mesh(
-  new THREE.TorusKnotGeometry(0.7, 0.24, 220, 32),
-  new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, metalness: 1 }),
-);
-metalKnot.position.set(0, 1.3, 0);
-metalKnot.castShadow = true;
-metalKnot.receiveShadow = true;
-demo.add(metalKnot);
-
-const ballMaterials = [
-  new THREE.MeshStandardMaterial({ color: 0xe23c57, roughness: 0.2, metalness: 0 }),
-  new THREE.MeshStandardMaterial({ color: 0x3c7be2, roughness: 0.6, metalness: 0 }),
-];
-[-2.6, 2.6].forEach((x, i) => {
-  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.7, 64, 64), ballMaterials[i]);
-  ball.position.set(x, 0.7, 0.8);
-  ball.castShadow = true;
-  ball.receiveShadow = true;
-  demo.add(ball);
-});
-
-scene.add(demo);
-
-/* ────────────────────── ЗАГРУЗЧИК МОДЕЛЕЙ (glTF / .glb) ────────────────────── */
-const gltfLoader = new GLTFLoader();
-
-function placeModel(model) {
-  model.traverse((obj) => {
-    if (obj.isMesh) {
-      obj.castShadow = true;
-      obj.receiveShadow = true;
-    }
+function loadFBX(url) {
+  return new Promise((resolve, reject) => {
+    fbxLoader.load(url, resolve, undefined, reject);
   });
-
-  const box = new THREE.Box3().setFromObject(model);
-  const maxDim = Math.max(...box.getSize(new THREE.Vector3()).toArray()) || 1;
-  model.scale.multiplyScalar(3 / maxDim);
-
-  const reboxed = new THREE.Box3().setFromObject(model);
-  const center = reboxed.getCenter(new THREE.Vector3());
-  model.position.x -= center.x;
-  model.position.z -= center.z;
-  model.position.y -= reboxed.min.y; // ставим на землю
-
-  scene.remove(demo);
-  scene.add(model);
-  controls.target.set(0, 1.2, 0);
 }
 
-// Автозагрузка public/models/scene.glb.
-// Vite отдаёт index.html (200) для несуществующих путей, поэтому проверяем не
-// статус, а сигнатуру файла: GLB начинается с 'glTF', JSON-вариант .gltf — с '{'.
-const MODEL_URL = 'models/scene.glb';
-fetch(MODEL_URL)
-  .then((r) => r.arrayBuffer())
-  .then((buf) => {
-    const view = new Uint8Array(buf);
-    const magic = String.fromCharCode(...view.slice(0, 4));
-    if (magic === 'glTF' || view[0] === 0x7b /* '{' */) {
-      gltfLoader.parse(
-        buf,
-        '',
-        (gltf) => {
-          placeModel(gltf.scene);
-          console.info(`[3d] Модель загружена: ${MODEL_URL}`);
-        },
-        (err) => console.error('[3d] Ошибка парсинга модели:', err),
-      );
-    } else {
-      console.info(
-        '[3d] Модель не найдена. Положи .glb в public/models/scene.glb — и он появится в сцене.',
-      );
-    }
-  })
-  .catch(() => {
-    console.info(
-      '[3d] Модель не найдена. Положи .glb в public/models/scene.glb — и он появится в сцене.',
-    );
+// Категории: файл, целевая высота (ед. сцены), число экземпляров, тень.
+const VEGETATION = [
+  { file: 'Tree1.fbx', height: 5.0, count: 5, shadow: true },
+  { file: 'Tree2.fbx', height: 5.5, count: 5, shadow: true },
+  { file: 'Tree3.fbx', height: 5.0, count: 4, shadow: true },
+  { file: 'Tree4.fbx', height: 6.0, count: 4, shadow: true },
+  { file: 'Bush1.fbx', height: 1.4, count: 8, shadow: true },
+  { file: 'Bush2.fbx', height: 1.2, count: 8, shadow: true },
+  { file: 'Bush3.fbx', height: 1.3, count: 8, shadow: true },
+  { file: 'Rock1.fbx', height: 1.1, count: 4, shadow: true },
+  { file: 'Rock2.fbx', height: 0.9, count: 3, shadow: true },
+  { file: 'Rock3.fbx', height: 1.3, count: 3, shadow: true },
+  { file: 'Grass1.fbx', height: 0.6, count: 20, shadow: false },
+  { file: 'Grass2.fbx', height: 0.5, count: 20, shadow: false },
+  { file: 'Grass3.fbx', height: 0.55, count: 20, shadow: false },
+];
+
+// Грузим модель один раз, нормализуем по высоте и сдвигаем так, чтобы начало
+// координат группы оказалось в нижнем-центре модели → удобно клонировать и
+// ставить на землю, вращение будет вокруг центра объекта.
+function makeTemplate(item) {
+  return loadFBX('models/' + item.file).then((raw) => {
+    raw.traverse((c) => {
+      if (c.isMesh) {
+        c.castShadow = item.shadow;
+        c.receiveShadow = true;
+      }
+    });
+
+    const box = new THREE.Box3().setFromObject(raw);
+    const size = box.getSize(new THREE.Vector3());
+    raw.scale.multiplyScalar(item.height / (size.y || 1));
+    raw.updateMatrixWorld(true);
+
+    const b = new THREE.Box3().setFromObject(raw);
+    const cx = (b.min.x + b.max.x) / 2;
+    const cz = (b.min.z + b.max.z) / 2;
+    raw.position.set(-cx, -b.min.y, -cz); // низ-центр → в начало координат
+
+    const template = new THREE.Group();
+    template.add(raw);
+    return template;
   });
+}
+
+const FIELD_RADIUS = 55; // радиус засеваемой области
+const CLEARING = 8; // пустое место в центре (открытое поле, место для камеры)
+
+function scatter(items) {
+  items.forEach(({ item, template }) => {
+    for (let i = 0; i < item.count; i++) {
+      // sqrt → равномерная плотность по площади; равномерный угол.
+      const angle = Math.random() * Math.PI * 2;
+      const r = CLEARING + (FIELD_RADIUS - CLEARING) * Math.sqrt(Math.random());
+
+      const inst = template.clone();
+      inst.position.set(Math.cos(angle) * r, 0, Math.sin(angle) * r);
+      inst.rotation.y = Math.random() * Math.PI * 2;
+      inst.scale.multiplyScalar(0.85 + Math.random() * 0.3); // ±15 % по высоте
+      scene.add(inst);
+    }
+  });
+  console.info('[3d] Растительность расставлена');
+}
+
+Promise.all(VEGETATION.map((item) => makeTemplate(item).then((template) => ({ item, template }))))
+  .then(scatter)
+  .catch((err) => console.error('[3d] Ошибка загрузки FBX:', err));
 
 /* ─────────────────────── РАЗМЕР ОКНА + ЦИКЛ ─────────────────────── */
 window.addEventListener('resize', () => {
@@ -254,10 +234,6 @@ window.addEventListener('resize', () => {
 });
 
 function animate() {
-  const t = performance.now() * 0.001;
-  metalKnot.rotation.y = t * 0.4;
-  metalKnot.rotation.x = t * 0.2;
-
   controls.update();
   renderer.render(scene, camera);
   requestAnimationFrame(animate);

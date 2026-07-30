@@ -136,14 +136,39 @@ function makeGroundTexture() {
   return tex;
 }
 
-// envMapIntent низкий — карта окружения не заливает тени, они остаются тёмными.
+// Параметры размещения центральных объектов (POND используется и для дыры в земле).
+const PILE = { size: 9, sink: 1.5 }; // куча грязи: размер и насколько утоплена в землю
+const POND = {
+  url: 'models/pond_with_waterfalls.glb',
+  x: -15,
+  z: 6,
+  size: 14,
+  sink: 1.2, // пруд опущен, но меньше кучи
+  holeRadius: 6.5, // радиус отверстия в земле под пруд
+};
+const ROCK = { url: 'models/Rock2.fbx', x: 7, z: 0, size: 4 }; // крупнее и заметнее
+
+// Земля с круглым отверстием под пруд: сквозь него виден basin водоёма, а не трава на y=0.
+const groundShape = new THREE.Shape();
+groundShape.moveTo(-1000, -1000);
+groundShape.lineTo(1000, -1000);
+groundShape.lineTo(1000, 1000);
+groundShape.lineTo(-1000, -1000);
+const pondHole = new THREE.Path();
+// Локальные XY земли; после поворота -90° по X локальное y → мировое -z.
+pondHole.absarc(POND.x, -POND.z, POND.holeRadius, 0, Math.PI * 2, true);
+groundShape.holes.push(pondHole);
+
+const groundTex = makeGroundTexture();
+groundTex.repeat.set(0.04, 0.04); // у ShapeGeometry UV = позиция → тайл каждые 25 ед.
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(2000, 2000),
+  new THREE.ShapeGeometry(groundShape),
   new THREE.MeshStandardMaterial({
-    map: makeGroundTexture(),
+    map: groundTex,
     roughness: 1,
     metalness: 0,
     envMapIntensity: 0.1,
+    side: THREE.DoubleSide,
   }),
 );
 ground.rotation.x = -Math.PI / 2;
@@ -313,16 +338,14 @@ gltfLoader.load(
         c.receiveShadow = false;
       }
     });
-    // Нормализуем до ~9 единиц и ставим по центру, на земле.
     const box = new THREE.Box3().setFromObject(pile);
     const size = box.getSize(new THREE.Vector3());
-    pile.scale.multiplyScalar(9 / (Math.max(size.x, size.y, size.z) || 1));
+    pile.scale.multiplyScalar(PILE.size / (Math.max(size.x, size.y, size.z) || 1));
     pile.updateMatrixWorld(true);
     const b = new THREE.Box3().setFromObject(pile);
     const center = b.getCenter(new THREE.Vector3());
-    pile.position.x -= center.x;
-    pile.position.z -= center.z;
-    pile.position.y -= b.min.y;
+    // В центре, утопленная в землю на PILE.sink (основание уходит под землю).
+    pile.position.set(-center.x, -b.min.y - PILE.sink, -center.z);
     scene.add(pile);
     console.info('[3d] Куча земли загружена');
   },
@@ -334,8 +357,7 @@ gltfLoader.load(
 );
 
 /* ───────────────────── Водоём с водопадами (GLB, unlit) ───────────────────── */
-// Слегка притапливаем в землю (sink), чтобы берег выглядел естественным.
-const POND = { url: 'models/pond_with_waterfalls.glb', x: -15, z: 6, size: 14, sink: 0.8 };
+// Притапливаем в землю (sink) — сквозь дыру в поверхности виден basin водоёма.
 gltfLoader.load(
   POND.url,
   (gltf) => {
@@ -361,7 +383,6 @@ gltfLoader.load(
 );
 
 /* ───────────────────── Отдельный камень на поверхности (FBX) ───────────────────── */
-const ROCK = { url: 'models/Rock2.fbx', x: 6, z: 0.5, size: 2.6 };
 fbxLoader.load(
   ROCK.url,
   (raw) => {
@@ -373,6 +394,7 @@ fbxLoader.load(
         mats.forEach((m) => {
           if (m.emissive) m.emissive.set(0x000000); // у FBX emissive == color
           if (m.specular) m.specular.set(0x111111);
+          if (m.color) m.color.set(0x7a7a7a); // осветляем — иначе тёмный камень теряется
           m.needsUpdate = true;
         });
       }

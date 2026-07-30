@@ -41,9 +41,10 @@ controls.maxPolarAngle = Math.PI * 0.495; // не проваливаться п�
 controls.target.set(0, 3, 0);
 
 /* ──────────────────────────── СВЕТ ──────────────────────────── */
-// Слабый ambient — именно поэтому тени получаются тёмными и заметными
-// (затенённые зоны почти не заливаются светом, контраст с освещёнными высок).
-scene.add(new THREE.HemisphereLight(0xbcd4e8, 0x3a4a2a, 0.12));
+// Небесная подсветка (sky/ground). Теперь, когда emissive материалов обнулён,
+// умеренный ambient даёт естественную заливку, а тени всё равно явно темнее
+// освещённых солнцем участков.
+scene.add(new THREE.HemisphereLight(0xbcd4e8, 0x3a4a2a, 0.4));
 
 // «Солнце» — тёплое и сильное, единственный доминирующий источник: именно
 // направленность + контраст дают ощущение настоящего солнца, а не белого света.
@@ -187,8 +188,17 @@ function makeTemplate(item) {
       if (c.isMesh) {
         c.castShadow = item.shadow;
         c.receiveShadow = true;
-        // IBL не должен заливать тени — гасим влияние окружения на материал.
-        if (c.material && 'envMapIntensity' in c.material) c.material.envMapIntensity = 0.15;
+        const mats = Array.isArray(c.material) ? c.material : [c.material];
+        mats.forEach((m) => {
+          // Модели экспортированы с emissive == color → они «самосветятся» полным
+          // цветом и почти не реагируют на свет/тени. Обнуляем emissive: теперь
+          // тени их реально затемняют, а яркий свет не выбеливает к белому.
+          if (m.emissive) m.emissive.set(0x000000);
+          if ('emissiveIntensity' in m) m.emissiveIntensity = 0;
+          // Убираем белые блики — листва матовая.
+          if (m.specular) m.specular.set(0x111111);
+          m.needsUpdate = true;
+        });
       }
     });
 

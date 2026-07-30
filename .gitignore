@@ -4,5 +4,6 @@ dist
 *.local
 .idea/
 
-# Слишком большие для Git ассеты (>100 МБ) — используй Git LFS
+# Тяжёлые GLB-модели — держим локально, в Git не пушим
 public/models/light_soil_dirt_pile.glb
+public/models/pond_with_waterfalls.glb

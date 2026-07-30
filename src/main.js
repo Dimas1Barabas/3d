@@ -10,8 +10,8 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap; // чёткие, отчётливые тени
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.5;
+renderer.toneMapping = THREE.AgXToneMapping; // AgX сохраняет цвет в светах — листва не выцветает к белому
+renderer.toneMappingExposure = 1.0;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 document.body.appendChild(renderer.domElement);
@@ -47,7 +47,7 @@ scene.add(new THREE.HemisphereLight(0xbcd4e8, 0x3a4a2a, 0.12));
 
 // «Солнце» — тёплое и сильное, единственный доминирующий источник: именно
 // направленность + контраст дают ощущение настоящего солнца, а не белого света.
-const sunLight = new THREE.DirectionalLight(0xffe2b0, 5.0);
+const sunLight = new THREE.DirectionalLight(0xffe2b0, 3.0);
 sunLight.castShadow = true;
 sunLight.shadow.mapSize.set(4096, 4096);
 sunLight.shadow.camera.near = 1;

@@ -8,7 +8,6 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-// Реализм: мягкие тени + кинематографичный тонмаппинг + корректный цвет
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap; // чёткие, отчётливые тени
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -21,8 +20,8 @@ const pmrem = new THREE.PMREMGenerator(renderer);
 
 /* ─────────────────────────── СЦЕНА ─────────────────────────── */
 const scene = new THREE.Scene();
-// Лёгкая дымка цвета горизонта — дальняя земля и растительность растворяются в небе.
-scene.fog = new THREE.Fog(0xbcd6f0, 60, 700);
+// Зелёноватая дымка джунглей — дальняя растительность растворяется в тумане.
+scene.fog = new THREE.Fog(0xb0bca0, 70, 850);
 
 /* ──────────────────────── КАМЕРА + УПРАВЛЕНИЕ ──────────────────────── */
 const camera = new THREE.PerspectiveCamera(
@@ -31,40 +30,38 @@ const camera = new THREE.PerspectiveCamera(
   0.1,
   5000,
 );
-camera.position.set(12, 6, 16);
+camera.position.set(14, 8, 18);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 controls.minDistance = 2;
-controls.maxDistance = 120;
+controls.maxDistance = 150;
 controls.maxPolarAngle = Math.PI * 0.495; // не проваливаться под землю
-controls.target.set(0, 2, 0);
+controls.target.set(0, 3, 0);
 
 /* ──────────────────────────── СВЕТ ──────────────────────────── */
-// Заполняющий свет неба/земли — мягкая подсветка теневых сторон.
-scene.add(new THREE.HemisphereLight(0xbcd6f0, 0x4a5d32, 0.6));
+// Слабый ambient — именно поэтому тени получаются тёмными и заметными
+// (затенённые зоны почти не заливаются светом, контраст с освещёнными высок).
+scene.add(new THREE.HemisphereLight(0xbcd4e8, 0x3a4a2a, 0.22));
 
-// «Солнце» — ключевой источник с направленными тенями.
-// Позицию задаём позже из направления солнца на небе (см. updateSun).
-const sunLight = new THREE.DirectionalLight(0xfff0d6, 3.6);
+// «Солнце» — единственный сильный источник, пробивающийся сквозь джунгли.
+const sunLight = new THREE.DirectionalLight(0xfff0d6, 3.8);
 sunLight.castShadow = true;
 sunLight.shadow.mapSize.set(4096, 4096);
 sunLight.shadow.camera.near = 1;
 sunLight.shadow.camera.far = 400;
-sunLight.shadow.camera.left = -60;
-sunLight.shadow.camera.right = 60;
-sunLight.shadow.camera.top = 60;
-sunLight.shadow.camera.bottom = -60;
-sunLight.shadow.bias = -0.0001;
+sunLight.shadow.camera.left = -70;
+sunLight.shadow.camera.right = 70;
+sunLight.shadow.camera.top = 70;
+sunLight.shadow.camera.bottom = -70;
+sunLight.shadow.bias = -0.0002;
 sunLight.shadow.normalBias = 0.01;
 sunLight.shadow.radius = 2;
 scene.add(sunLight);
 scene.add(sunLight.target);
 
 /* ──────────────────────────── НЕБО ──────────────────────────── */
-// Физический sky-шейлер (атмосферное рассеяние). Даёт реальный градиент
-// неба, видимое солнце и корректные отражения на металле.
 const sky = new Sky();
 sky.scale.setScalar(4000);
 scene.add(sky);
@@ -76,7 +73,7 @@ skyU['mieCoefficient'].value = 0.005;
 skyU['mieDirectionalG'].value = 0.8;
 
 const sunVec = new THREE.Vector3();
-const sceneEnv = new THREE.Scene(); // временное окружение для съёмки env-карты
+const sceneEnv = new THREE.Scene();
 let envRT;
 
 function updateSun(elevationDeg, azimuthDeg) {
@@ -84,14 +81,12 @@ function updateSun(elevationDeg, azimuthDeg) {
   const theta = THREE.MathUtils.degToRad(azimuthDeg);
   sunVec.setFromSphericalCoords(1, phi, theta);
 
-  skyU['sunPosition'].value.copy(sunVec); // видимое солнце на небе
+  skyU['sunPosition'].value.copy(sunVec);
 
-  // Направляем источник света вдоль солнца
   sunLight.position.copy(sunVec).multiplyScalar(150);
   sunLight.target.position.set(0, 0, 0);
   sunLight.target.updateMatrixWorld();
 
-  // Снимаем с неба карту окружения → даём её сцене для отражений
   if (envRT) envRT.dispose();
   sceneEnv.add(sky);
   envRT = pmrem.fromScene(sceneEnv);
@@ -100,56 +95,61 @@ function updateSun(elevationDeg, azimuthDeg) {
 }
 
 // Тёплое низковатое солнце ≈ «золотой час»: насыщенные цвета и богатый свет.
-// Чуть выше исходных 12°, чтобы тени были покороче, но не блёклый полдень.
 updateSun(20, 180);
 
 /* ──────────────────────────── ЗЕМЛЯ ──────────────────────────── */
-// Процедурная травянистая текстура (canvas) — без внешних файлов.
 function makeGroundTexture() {
   const size = 1024;
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const ctx = c.getContext('2d');
 
-  ctx.fillStyle = '#4a5d32';
+  ctx.fillStyle = '#3c4a28';
   ctx.fillRect(0, 0, size, size);
 
-  for (let i = 0; i < 500; i++) {
+  for (let i = 0; i < 600; i++) {
     const x = Math.random() * size;
     const y = Math.random() * size;
     const r = 20 + Math.random() * 90;
     if (Math.random() < 0.7) {
-      ctx.fillStyle = `rgba(${50 + Math.random() * 40},${85 + Math.random() * 55},${35 + Math.random() * 35},0.25)`;
+      ctx.fillStyle = `rgba(${40 + Math.random() * 40},${70 + Math.random() * 55},${28 + Math.random() * 32},0.28)`;
     } else {
-      ctx.fillStyle = `rgba(${90 + Math.random() * 50},${70 + Math.random() * 35},${35 + Math.random() * 25},0.25)`;
+      ctx.fillStyle = `rgba(${80 + Math.random() * 50},${60 + Math.random() * 35},${30 + Math.random() * 25},0.25)`;
     }
     ctx.beginPath();
     ctx.ellipse(x, y, r, r * (0.5 + Math.random()), Math.random() * Math.PI, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  for (let i = 0; i < 40000; i++) {
-    ctx.fillStyle = `rgba(${40 + Math.random() * 50},${70 + Math.random() * 60},${25 + Math.random() * 40},0.3)`;
+  for (let i = 0; i < 45000; i++) {
+    ctx.fillStyle = `rgba(${32 + Math.random() * 48},${60 + Math.random() * 60},${22 + Math.random() * 38},0.32)`;
     ctx.fillRect(Math.random() * size, Math.random() * size, 2, 2);
   }
 
   const tex = new THREE.CanvasTexture(c);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(60, 60);
+  tex.repeat.set(80, 80);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 8;
   return tex;
 }
 
+// envMapIntent низкий — карта окружения не заливает тени, они остаются тёмными.
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(2000, 2000),
-  new THREE.MeshStandardMaterial({ map: makeGroundTexture(), roughness: 1, metalness: 0 }),
+  new THREE.MeshStandardMaterial({
+    map: makeGroundTexture(),
+    roughness: 1,
+    metalness: 0,
+    envMapIntensity: 0.3,
+  }),
 );
 ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-/* ──────────────────────── РАСТИТЕЛЬНОСТЬ (FBX) ──────────────────────── */
+/* ──────────────────────── РАСТИТЕЛЬНОСТЬ (FBX → InstancedMesh) ──────────────────────── */
+// Используем инстансинг: тысячи объектов рисуются за считанные draw-call'ы.
 const fbxLoader = new FBXLoader();
 
 function loadFBX(url) {
@@ -158,32 +158,36 @@ function loadFBX(url) {
   });
 }
 
-// Категории: файл, целевая высота (ед. сцены), число экземпляров, тень.
+// file, целевая высота, число экземпляров (трава сажается кластерами, count не важен), тень.
 const VEGETATION = [
-  { file: 'Tree1.fbx', height: 5.0, count: 5, shadow: true },
-  { file: 'Tree2.fbx', height: 5.5, count: 5, shadow: true },
-  { file: 'Tree3.fbx', height: 5.0, count: 4, shadow: true },
-  { file: 'Tree4.fbx', height: 6.0, count: 4, shadow: true },
-  { file: 'Bush1.fbx', height: 1.4, count: 8, shadow: true },
-  { file: 'Bush2.fbx', height: 1.2, count: 8, shadow: true },
-  { file: 'Bush3.fbx', height: 1.3, count: 8, shadow: true },
-  { file: 'Rock1.fbx', height: 1.1, count: 4, shadow: true },
-  { file: 'Rock2.fbx', height: 0.9, count: 3, shadow: true },
-  { file: 'Rock3.fbx', height: 1.3, count: 3, shadow: true },
-  { file: 'Grass1.fbx', height: 0.6, count: 20, shadow: false },
-  { file: 'Grass2.fbx', height: 0.5, count: 20, shadow: false },
-  { file: 'Grass3.fbx', height: 0.55, count: 20, shadow: false },
+  { file: 'Tree1.fbx', height: 5.0, count: 90, shadow: true },
+  { file: 'Tree2.fbx', height: 5.5, count: 90, shadow: true },
+  { file: 'Tree3.fbx', height: 5.0, count: 90, shadow: true },
+  { file: 'Tree4.fbx', height: 6.0, count: 90, shadow: true },
+  { file: 'Bush1.fbx', height: 1.4, count: 35, shadow: true },
+  { file: 'Bush2.fbx', height: 1.2, count: 35, shadow: true },
+  { file: 'Bush3.fbx', height: 1.3, count: 35, shadow: true },
+  { file: 'Rock1.fbx', height: 1.1, count: 12, shadow: true },
+  { file: 'Rock2.fbx', height: 0.9, count: 12, shadow: true },
+  { file: 'Rock3.fbx', height: 1.3, count: 12, shadow: true },
+  { file: 'Grass1.fbx', height: 0.6, count: 0, shadow: false },
+  { file: 'Grass2.fbx', height: 0.5, count: 0, shadow: false },
+  { file: 'Grass3.fbx', height: 0.55, count: 0, shadow: false },
 ];
 
-// Грузим модель один раз, нормализуем по высоте и сдвигаем так, чтобы начало
-// координат группы оказалось в нижнем-центре модели → удобно клонировать и
-// ставить на землю, вращение будет вокруг центра объекта.
+const FIELD_RADIUS = 50; // радиус засеваемой области (плотные джунгли)
+const CLEARING = 10; // открытая поляна в центре
+
+// Грузим модель один раз, нормализуем по высоте, ставим начало координат
+// группы в нижний-центр модели.
 function makeTemplate(item) {
   return loadFBX('models/' + item.file).then((raw) => {
     raw.traverse((c) => {
       if (c.isMesh) {
         c.castShadow = item.shadow;
         c.receiveShadow = true;
+        // IBL не должен заливать тени — гасим влияние окружения на материал.
+        if (c.material && 'envMapIntensity' in c.material) c.material.envMapIntensity = 0.3;
       }
     });
 
@@ -195,57 +199,86 @@ function makeTemplate(item) {
     const b = new THREE.Box3().setFromObject(raw);
     const cx = (b.min.x + b.max.x) / 2;
     const cz = (b.min.z + b.max.z) / 2;
-    raw.position.set(-cx, -b.min.y, -cz); // низ-центр → в начало координат
+    raw.position.set(-cx, -b.min.y, -cz);
 
     const template = new THREE.Group();
     template.add(raw);
+    template.updateMatrixWorld(true);
     return template;
   });
 }
 
-const FIELD_RADIUS = 55; // радиус засеваемой области
-const CLEARING = 8; // пустое место в центре (открытое поле, место для камеры)
+// Случайная позиция на поле (sqrt → равномерность по площади), вне поляны.
+function fieldPos() {
+  const angle = Math.random() * Math.PI * 2;
+  const r = CLEARING + (FIELD_RADIUS - CLEARING) * Math.sqrt(Math.random());
+  return new THREE.Vector3(Math.cos(angle) * r, 0, Math.sin(angle) * r);
+}
+
+// Набор трансформаций (позиция, поворот, масштаб) для одного типа растительности.
+function transformsFor(item) {
+  const out = [];
+  const push = (pos) =>
+    out.push({ pos, rotY: Math.random() * Math.PI * 2, scale: 0.8 + Math.random() * 0.4 });
+
+  if (item.file.startsWith('Grass')) {
+    // Трава — плотными пятнами (кластерами), густой подлесок.
+    const CLUSTERS = 260;
+    const PER_CLUSTER = 8;
+    const CLUSTER_RADIUS = 2.2;
+    for (let c = 0; c < CLUSTERS; c++) {
+      const center = fieldPos();
+      for (let k = 0; k < PER_CLUSTER; k++) {
+        const a = Math.random() * Math.PI * 2;
+        const d = Math.random() * CLUSTER_RADIUS;
+        push(new THREE.Vector3(center.x + Math.cos(a) * d, 0, center.z + Math.sin(a) * d));
+      }
+    }
+  } else {
+    for (let i = 0; i < item.count; i++) push(fieldPos());
+  }
+  return out;
+}
+
+// Из шаблона и списка трансформаций строим InstancedMesh (по одному на меш модели).
+const _yAxis = new THREE.Vector3(0, 1, 0);
+const _q = new THREE.Quaternion();
+const _s = new THREE.Vector3();
+const _instMat = new THREE.Matrix4();
+const _m = new THREE.Matrix4();
+
+function buildInstanced(template, transforms) {
+  const result = [];
+  template.traverse((c) => {
+    if (!c.isMesh) return;
+    const im = new THREE.InstancedMesh(c.geometry, c.material, transforms.length);
+    im.castShadow = c.castShadow;
+    im.receiveShadow = true;
+    im.frustumCulled = false;
+    const meshWorld = c.matrixWorld; // включает нормализацию шаблона (масштаб + сдвиг)
+    for (let i = 0; i < transforms.length; i++) {
+      const t = transforms[i];
+      _q.setFromAxisAngle(_yAxis, t.rotY);
+      _s.set(t.scale, t.scale, t.scale);
+      _instMat.compose(t.pos, _q, _s);
+      _m.multiplyMatrices(_instMat, meshWorld);
+      im.setMatrixAt(i, _m);
+    }
+    im.instanceMatrix.needsUpdate = true;
+    result.push(im);
+  });
+  return result;
+}
 
 function scatter(items) {
-  // Деревья / кусты / камни — равномерно по полю.
+  let total = 0;
   items.forEach(({ item, template }) => {
-    if (item.file.startsWith('Grass')) return; // траву сажаем плотными пятнами ниже
-    for (let i = 0; i < item.count; i++) {
-      // sqrt → равномерная плотность по площади; равномерный угол.
-      const angle = Math.random() * Math.PI * 2;
-      const r = CLEARING + (FIELD_RADIUS - CLEARING) * Math.sqrt(Math.random());
-
-      const inst = template.clone();
-      inst.position.set(Math.cos(angle) * r, 0, Math.sin(angle) * r);
-      inst.rotation.y = Math.random() * Math.PI * 2;
-      inst.scale.multiplyScalar(0.85 + Math.random() * 0.3); // ±15 % по высоте
-      scene.add(inst);
-    }
+    const transforms = transformsFor(item);
+    total += transforms.length;
+    if (!transforms.length) return;
+    buildInstanced(template, transforms).forEach((im) => scene.add(im));
   });
-
-  // Трава — плотными кластерами (пятнами), чтобы росла кучно, а не поштучно.
-  const grass = items
-    .filter(({ item }) => item.file.startsWith('Grass'))
-    .map((g) => g.template);
-  const CLUSTERS = 45; // число пятен
-  const PER_CLUSTER = 6; // травинок в пятне
-  const CLUSTER_RADIUS = 2.5; // радиус пятна
-  for (let c = 0; c < CLUSTERS; c++) {
-    const ca = Math.random() * Math.PI * 2;
-    const cr = CLEARING + (FIELD_RADIUS - CLEARING) * Math.sqrt(Math.random());
-    const cx = Math.cos(ca) * cr;
-    const cz = Math.sin(ca) * cr;
-    for (let k = 0; k < PER_CLUSTER; k++) {
-      const a = Math.random() * Math.PI * 2;
-      const d = Math.random() * CLUSTER_RADIUS;
-      const inst = grass[(Math.random() * grass.length) | 0].clone();
-      inst.position.set(cx + Math.cos(a) * d, 0, cz + Math.sin(a) * d);
-      inst.rotation.y = Math.random() * Math.PI * 2;
-      inst.scale.multiplyScalar(0.85 + Math.random() * 0.3);
-      scene.add(inst);
-    }
-  }
-  console.info('[3d] Растительность расставлена');
+  console.info(`[3d] Джунгли засажены: ${total} объектов (инстансинг)`);
 }
 
 Promise.all(VEGETATION.map((item) => makeTemplate(item).then((template) => ({ item, template }))))

@@ -335,7 +335,7 @@ gltfLoader.load(
 
 /* ───────────────────── Водоём с водопадами (GLB, unlit) ───────────────────── */
 // Слегка притапливаем в землю (sink), чтобы берег выглядел естественным.
-const POND = { url: 'models/pond_with_waterfalls.glb', x: -15, z: 6, size: 14, sink: 1.5 };
+const POND = { url: 'models/pond_with_waterfalls.glb', x: -15, z: 6, size: 14, sink: 0.8 };
 gltfLoader.load(
   POND.url,
   (gltf) => {
@@ -361,7 +361,7 @@ gltfLoader.load(
 );
 
 /* ───────────────────── Отдельный камень на поверхности (FBX) ───────────────────── */
-const ROCK = { url: 'models/Rock2.fbx', x: 11, z: -7, size: 2.6 };
+const ROCK = { url: 'models/Rock2.fbx', x: 6, z: 0.5, size: 2.6 };
 fbxLoader.load(
   ROCK.url,
   (raw) => {
